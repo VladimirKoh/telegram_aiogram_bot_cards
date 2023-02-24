@@ -34,6 +34,24 @@ def add_card(id_card: int, user_id: str):
     connection.close()
 
 
+def add_date_attemp(user_id: str, date_time):
+    connection = connect()
+    with connection.cursor() as cursor:
+        query = f"UPDATE users SET date_attemp = '{date_time}' WHERE user_id = {user_id}"
+        cursor.execute(query)
+        connection.commit()
+    connection.close()
+
+
+def un_attemp(user_id: str):
+    connection = connect()
+    with connection.cursor() as cursor:
+        query = f"UPDATE users SET attemp = attemp - 1 WHERE user_id = {user_id}"
+        cursor.execute(query)
+        connection.commit()
+    connection.close()
+
+
 def get_point(user_id: str):
     connection = connect()
     with connection.cursor() as cursor:
@@ -62,7 +80,6 @@ def get_user(user_id: str):
         cursor.execute(query)
     data = cursor.fetchone()
     connection.close()
-    print(data)
     return data
 
 

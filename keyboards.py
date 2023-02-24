@@ -56,3 +56,21 @@ def get_bouling_keyboard() -> InlineKeyboardMarkup:
     ib3 = InlineKeyboardButton('💰 Пополнить баланс', callback_data='up_pay')
     ikb.add(ib1, ib2, ib3)
     return ikb
+
+
+def get_basketball_keyboard() -> InlineKeyboardMarkup:
+    ikb = InlineKeyboardMarkup(row_width=1)
+    ib1 = InlineKeyboardButton('🏀 Сыграть', callback_data='game_basketball_play')
+    ib2 = InlineKeyboardButton('💵 Купить 6 бросков', callback_data='pay_6_basketball')
+    ib3 = InlineKeyboardButton('💰 Пополнить баланс', callback_data='up_pay')
+    ikb.add(ib1, ib2, ib3)
+    return ikb
+
+
+def get_darts_keyboard() -> InlineKeyboardMarkup:
+    ikb = InlineKeyboardMarkup(row_width=1)
+    ib1 = InlineKeyboardButton('🎯 Сыграть', callback_data='game_darts_play')
+    ib2 = InlineKeyboardButton('💵 Купить 5 бросков', callback_data='pay_5_darts')
+    ib3 = InlineKeyboardButton('💰 Пополнить баланс', callback_data='up_pay')
+    ikb.add(ib1, ib2, ib3)
+    return ikb

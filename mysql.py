@@ -61,6 +61,15 @@ def up_attemp(user_id: str, attemp):
     connection.close()
 
 
+def un_attemp_cube(user_id: str):
+    connection = connect()
+    with connection.cursor() as cursor:
+        query = f"UPDATE users SET attemp_cube = attemp_cube - 1 WHERE user_id = {user_id}"
+        cursor.execute(query)
+        connection.commit()
+    connection.close()
+
+
 def up_balance(user_id: str, summa):
     connection = connect()
     with connection.cursor() as cursor:

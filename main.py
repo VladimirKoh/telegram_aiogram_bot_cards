@@ -138,19 +138,24 @@ async def command_my_garazhe(message: types.Message, state: FSMContext):
     if not mysql.get_user(message.from_user.id):
         mysql.add_user(message.from_user.id, message.from_user.username)
     result = mysql.get_cards_user(message.from_user.id)
-    
+    result2 = list()
+    for i in result:
+        if i['url'] not in result2:
+            result2.append(i['url'])
+    if len(result2) == 0:
+        await message.answer('У вас еще нет карточек')
+    # result2 = list({i['url'] for i in result})
     # result2 = mysql.get_cards_user(message.from_user.id)
     # с оптимизировать
     count_points = sum([i['get_point'] for i in result])
-    page_all = len(result)
+    page_all = len(result2)
     description = f"🚙 Мои карты\n\n🏠 Всего очков {count_points}"
     async with state.proxy() as data:
         data['page'] = 0
         data['page_all'] = page_all
-        data['data'] = result
+        data['data'] = result2
         data['count_points'] = count_points
-    print(data['data'])
-    await message.answer_photo(open(result[0]['url'], 'rb'),
+    await message.answer_photo(open(result2[0], 'rb'),
                                caption=description,
                                reply_markup=get_pagination(data['page'], data['page_all']))
 
@@ -217,14 +222,14 @@ async def callback_check_balance_pay(callback: types.CallbackQuery):
         await callback.answer('⚠️ Платеж не найден\nПопробуйте проверить через несколько секунд.', show_alert=True)
 
 
-@dp.message_handler(commands=['spot_pass'])
-async def admin_test(message: types.Message):
-    next_data = datetime.now() + timedelta(30)
-    mysql.up_spot_pass(message.from_user.id)
-    mysql.set_date_spot_pass(message.from_user.id, next_data.strftime('%Y-%m-%d %H:%M:%S'))
-    # проставить дату на месяц вперед.
-    await message.answer('Вы приобрели Caroholics Membership', reply_markup=get_universe_keyboard())
-    mysql.set_date_cube(message.from_user.id, datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+# @dp.message_handler(commands=['spot_pass'])
+# async def admin_test(message: types.Message):
+#     next_data = datetime.now() + timedelta(30)
+#     mysql.up_spot_pass(message.from_user.id)
+#     mysql.set_date_spot_pass(message.from_user.id, next_data.strftime('%Y-%m-%d %H:%M:%S'))
+#     # проставить дату на месяц вперед.
+#     await message.answer('Вы приобрели Caroholics Membership', reply_markup=get_universe_keyboard())
+#     mysql.set_date_cube(message.from_user.id, datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
 
 
 @dp.callback_query_handler(Text(startswith='check_pay_'))
@@ -232,7 +237,7 @@ async def callback_check_balance_pay(callback: types.CallbackQuery):
     label = callback.data.split('_')[-1]
     result = sucsess_pay(label)
     if result[0]:
-        summa_pay = math.ceil(result[1])
+        summa_pay = math.ceil(result[1] / 97 * 100)
         # стуст spot_pass поставить в значение тру и дату окончания проставить на месяц вперед
         mysql.up_balance(callback.from_user.id, summa_pay)
         await callback.message.answer('Платеж успешно прошел', reply_markup=get_universe_keyboard())
@@ -351,7 +356,7 @@ async def callback_next(callback: types.CallbackQuery, state: FSMContext):
     async with state.proxy() as data:
         if data['page_all'] > data['page'] + 1:
             data['page'] += 1
-            url_photo = data['data'][data['page']]['url']
+            url_photo = data['data'][data['page']]
             description = f"🚙 Мои карты\n\n🏠 Всего очков {data['count_points']}"
             await update_media(callback.message, photo=open(url_photo, 'rb'), page_all=data['page_all'], page_now=data['page'], description=description)
 
@@ -362,7 +367,7 @@ async def callback_back(callback: types.CallbackQuery, state: FSMContext):
     async with state.proxy() as data:
         if data['page'] > 0:
             data['page'] -= 1
-            url_photo = data['data'][data['page']]['url']
+            url_photo = data['data'][data['page']]
             description = f"🚙 Мои карты\n\n🏠 Всего очков {data['count_points']}"
             await update_media(callback.message, photo=open(url_photo, 'rb'), page_all=data['page_all'], page_now=data['page'], description=description)
 

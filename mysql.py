@@ -88,6 +88,15 @@ def up_spot_pass(user_id):
     connection.close()
 
 
+def set_date_spot_pass(user_id, date_spot_pass):
+    connection = connect()
+    with connection.cursor() as cursor:
+        query = f"UPDATE users SET date_spot_pass = '{date_spot_pass}' WHERE user_id = {user_id}"
+        cursor.execute(query)
+        connection.commit()
+    connection.close()
+
+
 def set_date_cube(user_id, date_cube):
     connection = connect()
     with connection.cursor() as cursor:

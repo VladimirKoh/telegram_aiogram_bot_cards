@@ -87,8 +87,8 @@ def get_spot_pass_keyboard() -> InlineKeyboardMarkup:
 
 def get_url_pay_169(label) -> InlineKeyboardMarkup:
     ikb = InlineKeyboardMarkup(row_width=1)
-    ib1 = InlineKeyboardButton('Перейти к оплате', url=payment_yandex(169, label))
-    ib2 = InlineKeyboardButton('✅ Я оплатил(а)', callback_data=f'check_pay_{label}')
+    ib1 = InlineKeyboardButton('Перейти к оплате', url=payment_yandex(10, label))
+    ib2 = InlineKeyboardButton('✅ Я оплатил(а)', callback_data=f'check_pay_spot_pass_{label}')
     ikb.add(ib1, ib2)
     return ikb
 

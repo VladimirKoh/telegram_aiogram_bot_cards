@@ -11,15 +11,18 @@ from contextlib import suppress
 from dotenv import load
 from datetime import time, timedelta, date, datetime
 
+import asyncio
 from utils import *
 from keyboards import *
 import mysql
 import os
+import logging
 
 from yandex import sucsess_pay
 
 
 load()
+logging.basicConfig(level=logging.INFO, filename="py_log.log", filemode="w")
 
 
 storage = MemoryStorage()
@@ -84,8 +87,9 @@ async def command_start(message: types.Message):
 
 @dp.message_handler(Text(equals='🚙 Получить карту'))
 async def command_get_card(message: types.Message):
+    if not mysql.get_user(message.from_user.id):
+        mysql.add_user(message.from_user.id, message.from_user.username)
     user_info = mysql.get_user(message.from_user.id)
-    print(user_info)
     if user_info.get('attemp', 0) > 0:
         if user_info.get('spot_pass', 0):
             type_card = random_card(True)
@@ -97,10 +101,10 @@ async def command_get_card(message: types.Message):
         count_cards = sum([i['get_point'] for i in all_cards])
         # card = [i for i in all_cards if i['id'] == card_id][0]
         await message.answer_photo(photo=open(card_user['url'], 'rb'), caption=f"🚙 Забирай свою новую тачку!\n\n💎 Редкость: {convert_type(card_user['type_card'])} (+{card_user['get_point']} pts)\n🏠 Всего у тебя: ({count_cards} pts)")
+        mysql.un_attemp(message.from_user.id)
     else:
         date_now = datetime.now()
         formatted_date_now = date_now.strftime('%Y-%m-%d %H:%M:%S')
-        print(formatted_date_now)
         if user_info['date_attemp'] > date_now:
             delta = user_info['date_attemp'] - date_now
             s = delta.seconds
@@ -112,21 +116,27 @@ async def command_get_card(message: types.Message):
                 await message.answer(f'Следующая попытка будет доступна\nчерез {h} ч {m} минут')
         else:
             # механизм получения карты 
-            if user_info.get('spot_pass', 0):
+            if user_info.get('spot_pass', True):
                 type_card = random_card(True)
+                mysql.add_card(card_user['id'], message.from_user.id)
+                all_cards = mysql.get_cards_user(message.from_user.id)
+                count_cards = sum([i['get_point'] for i in all_cards])
+                mysql.add_date_attemp(message.from_user.id, (date_now + timedelta(hours=3)).strftime('%Y-%m-%d %H:%M:%S'))
             else:
                 type_card = random_card(False)
                 card_user = mysql.get_random_card(type_card)
                 mysql.add_card(card_user['id'], message.from_user.id)
                 all_cards = mysql.get_cards_user(message.from_user.id)
                 count_cards = sum([i['get_point'] for i in all_cards])
+                mysql.add_date_attemp(message.from_user.id, (date_now + timedelta(hours=4)).strftime('%Y-%m-%d %H:%M:%S'))
             await message.answer_photo(photo=open(card_user['url'], 'rb'), caption=f"🚙 Забирай свою новую тачку!\n\n💎 Редкость: {convert_type(card_user['type_card'])} (+{card_user['get_point']} pts)\n🏠 Всего у тебя: ({count_cards} pts)")
-            mysql.add_date_attemp(message.from_user.id, (date_now + timedelta(hours=4)).strftime('%Y-%m-%d %H:%M:%S'))
 
 
 @dp.message_handler(Text(equals="🏠 Мой гараж"))
 async def command_my_garazhe(message: types.Message, state: FSMContext):
-    result = mysql.get_cards_user_distinct(message.from_user.id)
+    if not mysql.get_user(message.from_user.id):
+        mysql.add_user(message.from_user.id, message.from_user.username)
+    result = mysql.get_cards_user(message.from_user.id)
     # result2 = mysql.get_cards_user(message.from_user.id)
     # с оптимизировать
     count_points = sum([i['get_point'] for i in result])
@@ -189,17 +199,29 @@ async def callback_pay_balance_spot_pass(callback: types.CallbackQuery):
     await edit_text_and_keyboard(callback.message, text, get_url_pay_169, label)
 
 
+@dp.callback_query_handler(Text(startswith='check_pay_spot_pass_'))
+async def callback_check_balance_pay(callback: types.CallbackQuery):
+    label = callback.data.split('_')[-1]
+    result = sucsess_pay(label)
+    if result[0]:
+        next_data = datetime.now() + timedelta(30)
+        # стуст spot_pass поставить в значение тру и дату окончания проставить на месяц вперед
+        mysql.up_spot_pass(callback.from_user.id)
+        mysql.set_date_spot_pass(callback.from_user.id, next_data.strftime('%Y-%m-%d %H:%M:%S'))
+        # проставить дату на месяц вперед.
+        await callback.message.answer('Вы приобрели Caroholics Membership', reply_markup=get_universe_keyboard())
+    else:
+        await callback.answer('⚠️ Платеж не найден\nПопробуйте проверить через несколько секунд.', show_alert=True)
+
+
 @dp.callback_query_handler(Text(startswith='check_pay_'))
 async def callback_check_balance_pay(callback: types.CallbackQuery):
     label = callback.data.split('_')[-1]
     result = sucsess_pay(label)
     if result[0]:
-        next_data = date.today() + timedelta(30)
-        summa_pay = math.ceil(result[1]) + 30
+        summa_pay = math.ceil(result[1])
         # стуст spot_pass поставить в значение тру и дату окончания проставить на месяц вперед
         mysql.up_balance(callback.from_user.id, summa_pay)
-        mysql.up_spot_pass(callback.from_user.id)
-
         await callback.message.answer('Платеж успешно прошел', reply_markup=get_universe_keyboard())
     else:
         await callback.answer('⚠️ Платеж не найден\nПопробуйте проверить через несколько секунд.', show_alert=True)
@@ -207,7 +229,16 @@ async def callback_check_balance_pay(callback: types.CallbackQuery):
 
 @dp.callback_query_handler(Text(equals="pay_spot_pass"))
 async def callback_pay_spot_pass(callback: types.CallbackQuery):
-    text = """📈 Внеси вклад в развитие проекта и стань частью сообщества Caroholics!
+    data = mysql.get_user(callback.from_user.id)
+    await callback.answer(None)
+    if data['spot_pass']:
+        date_now = datetime.now()
+        date_spot_pass = data['date_spot_pass']
+        days = (date_spot_pass.date() - date_now.date()).days
+        text = f"🪪 До конца Caroholics Membership осталось {days} д."
+        await callback.message.answer(text)
+    else:
+        text = """📈 Внеси вклад в развитие проекта и стань частью сообщества Caroholics!
 
 🪪 Владельцы Caroholics Membership наделяются следующими привилегиями:
 
@@ -219,12 +250,13 @@ async def callback_pay_spot_pass(callback: types.CallbackQuery):
 📌 Срок действия Caroholics Membership - 30 дней с момента покупки
 
 🪪 Caroholics Membership - 169 рублей"""
-    await callback.message.answer(text, reply_markup=get_spot_pass_keyboard())
+        await callback.message.answer(text, reply_markup=get_spot_pass_keyboard())
 
 
 @dp.callback_query_handler(Text(equals="top_10_players"))
 # user_id заменить на ЛОГИНЫ
 async def callback_top_10_players(callback: types.CallbackQuery):
+    await callback.answer(None)
     data = mysql.get_top_10_players()
     result_list = list()
     result_list.append('🏆 Топ-10 игроков за все время \n\n')
@@ -237,6 +269,7 @@ async def callback_top_10_players(callback: types.CallbackQuery):
 @dp.callback_query_handler(Text(equals="top_10_players_seasone"))
 # user_id заменить на ЛОГИНЫ
 async def callback_top_10_players_seasone(callback: types.CallbackQuery):
+    await callback.answer(None)
     data = mysql.get_top_10_players_seasone()
     result_list = list()
     result_list.append('🏆 Топ-10 игроков сезона\n\n')
@@ -266,12 +299,12 @@ async def callback_games(callback: types.CallbackQuery):
     text = f"""🛠️Добро пожаловать в Тюнинг!
 Здесь ты можешь обменять дубликаты карт на попытки 
 
-Количество повторок:
+Количество дубликатов:
 
 Basic: {basic}
 Civil: {civil}
-Extra: {extra}
 Rare: {rare}
+Extra: {extra}
 
 10 Basic = 3 попытки
 10 Сivil = 9 попыток
@@ -331,7 +364,6 @@ async def command_play(callback: types.CallbackQuery):
         await callback.message.answer(f'На 🎲 кубике число <b>{number}</b>\n\nВы получаете <b>{number}</b> бесплатных попыток на открытие карт')
         mysql.set_date_cube(callback.from_user.id, (datetime.now() + timedelta(7)).strftime('%Y-%m-%d %H:%M:%S'))
         mysql.up_attemp(callback.from_user.id, number)
-
     else:
         await callback.message.answer('⚠️ На этой неделе броски кубика закончились')
 
@@ -346,15 +378,17 @@ async def command_kazino(callback: types.CallbackQuery):
 @dp.callback_query_handler(Text(equals='game_kazino_play'))
 async def command_play_kazino(callback: types.CallbackQuery):
     balance = mysql.get_balance(callback.from_user.id)
-    if balance.get('balance', 0) >= 100:
-        mysql.un_balance(callback.from_user.id, 100)
+    if balance.get('balance', 0) >= 50:
+        mysql.un_balance(callback.from_user.id, 50)
         result = await bot.send_dice(chat_id=callback.from_user.id, emoji="🎰") # 43-(lime), 64-(777), 1-(bar bar bar), 22-(sliva)
         # запрос к базе данных на списание 50 рублей
         if result.dice.value in [1, 43, 64, 22]:
+            await asyncio.sleep(3)
             await callback.message.answer(f'🎉 Джекпот! Тебе начислено 10 попыток', reply_markup=get_kazino_keyboard())
             mysql.up_attemp(callback.from_user.id, 10)
             # запрос в базу данных пополнить на 10 попыток пользователю
         else:
+            await asyncio.sleep(3)
             await callback.message.answer(f'Не повезло☹️\nПопробуем еще раз?', reply_markup=get_kazino_keyboard())
     else:
         await callback.answer('⚠️ Не достаточно средств на балансе')
@@ -391,6 +425,7 @@ async def command_play_bouling(callback: types.CallbackQuery, state: FSMContext)
                 data['bouling'] -= 1
                 result = await bot.send_dice(chat_id=callback.from_user.id, emoji="🎳")
                 number = result.dice.value
+                await asyncio.sleep(3)
                 if number == 6:
                     await callback.message.answer('⭐️ Страйк!\nТебе начислена 1 попытка', reply_markup=get_bouling_keyboard())
                     mysql.set_date_bouling(callback.from_user.id, (datetime.now() + timedelta(1)).strftime('%Y-%m-%d %H:%M:%S'))
@@ -441,6 +476,7 @@ async def command_play_basketball(callback: types.CallbackQuery, state: FSMConte
                 data['basketball'] -= 1
                 result = await bot.send_dice(chat_id=callback.from_user.id, emoji="🏀")
                 number = result.dice.value
+                await asyncio.sleep(3)
                 if number > 3:
                     data['basketball_point'] += 1
                     await callback.message.answer('✨ Ты попал!\nПродолжай в том же духе!', reply_markup=get_basketball_keyboard())
@@ -488,6 +524,7 @@ async def command_play_darts(callback: types.CallbackQuery, state: FSMContext):
                 data['darts'] -= 1
                 result = await bot.send_dice(chat_id=callback.from_user.id, emoji="🎯")
                 number = result.dice.value
+                await asyncio.sleep(3)
                 if number == 6:
                     data['darts_point'] = True
                     await callback.message.answer('🔴 В яблочко!\nТебе начислена 1 попытка.', reply_markup=get_darts_keyboard())

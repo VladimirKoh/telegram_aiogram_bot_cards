@@ -1,0 +1,30 @@
+version: "3.1"
+
+volumes:
+  bot-mysql:
+
+services:
+  bot-cards:
+    build: .
+    restart: always
+    command: python3 main.py
+    env_file:
+      - ".env"
+  db:
+    image: mysql
+    command: --default-authentication-plugin=mysql_native_password
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: "123123vv"
+      MYSQL_DATABASE: "bot_cards"
+      MYSQL_USER: "homa"
+      MYSQL_PASSWORD: "123123vv"
+    volumes:
+      - "./bot_cards.sql:/docker-entrypoint-initdb.d/init.sql"
+      - "bot-mysql:/var/lib/mysql"
+
+  adminer:
+    image: adminer
+    restart: always
+    ports:
+      - 8080:8080

@@ -4,10 +4,12 @@ from aiogram import Bot, Dispatcher, executor, types
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, InputMedia
 from aiogram.dispatcher.filters import Text
+from aiogram.utils.exceptions import BotBlocked
 from aiogram.utils.exceptions import MessageNotModified
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters.state import State, StatesGroup
 from contextlib import suppress
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from dotenv import load
 from datetime import time, timedelta, date, datetime
 
@@ -63,6 +65,13 @@ async def edit_text_and_keyboard2(message: types.Message, new_text: str, func: I
             await message.edit_text(new_text, reply_markup=func(label, summa))
         else:
             await message.edit_text(new_text, reply_markup=func())
+
+
+async def send_message_get_cards(user_id):
+    try:
+        await bot.send_message(chat_id=user_id, text="🚙 Пришло время получить новую тачку!")
+    except BotBlocked as e:
+        logging.info(f'{user_id} заблокировал бота {e}')
 
 
 @dp.message_handler(commands=['start'])
@@ -123,6 +132,7 @@ async def command_get_card(message: types.Message):
                 all_cards = mysql.get_cards_user(message.from_user.id)
                 count_cards = sum([i['get_point'] for i in all_cards])
                 mysql.add_date_attemp(message.from_user.id, (date_now + timedelta(hours=3)).strftime('%Y-%m-%d %H:%M:%S'))
+                scheduler.add_job(send_message_get_cards, "date", run_date=date_now + timedelta(hours=3), args=(message.from_user.id, ))
             else:
                 type_card = random_card(False)
                 card_user = mysql.get_random_card(type_card)
@@ -562,4 +572,6 @@ async def command_play_darts(callback: types.CallbackQuery, state: FSMContext):
 
         
 if __name__ == '__main__':
+    scheduler = AsyncIOScheduler(timezone='Europe/Moscow')
+    scheduler.start()
     executor.start_polling(dp, skip_updates=True)

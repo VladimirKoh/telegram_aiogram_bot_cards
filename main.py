@@ -398,7 +398,7 @@ async def command_play(callback: types.CallbackQuery, state: FSMContext):
             number = result.dice.value
             await asyncio.sleep(3)
             await callback.message.answer(f'На 🎲 кубике число <b>{number}</b>\n\nВы получаете <b>{number}</b> бесплатных попыток на открытие карт')
-            mysql.set_date_cube(callback.from_user.id, (datetime.now() + timedelta(7)).strftime('%Y-%m-%d %H:%M:%S'))
+            mysql.set_date_cube(callback.from_user.id, (datetime.now() + timedelta(7)).strftime('%Y-%m-%d 00:00:01'))
             mysql.up_attemp(callback.from_user.id, number)
         else:
             await callback.message.answer('⚠️ На этой неделе броски кубика закончились')
@@ -454,9 +454,9 @@ async def command_play_bouling(callback: types.CallbackQuery, state: FSMContext)
             if data['bouling'] == 0:
                 await callback.message.delete()
                 mysql.un_balance(callback.from_user.id, 50)
-                await callback.message.answer('Ты израсходовал лимит игр')
+                await callback.message.answer('😞 Ты израсходовал лимит игр')
             elif data['bouling'] < 0:
-                await callback.message.answer('Ты израсходовал лимит игр на сегодня')
+                await callback.message.answer('😞 Ты израсходовал лимит игр на сегодня')
             else:
                 data['bouling'] -= 1
                 result = await bot.send_dice(chat_id=callback.from_user.id, emoji="🎳")
@@ -464,7 +464,7 @@ async def command_play_bouling(callback: types.CallbackQuery, state: FSMContext)
                 await asyncio.sleep(3)
                 if number == 6:
                     await callback.message.answer('⭐️ Страйк!\nТебе начислена 1 попытка', reply_markup=get_bouling_keyboard())
-                    mysql.set_date_bouling(callback.from_user.id, (datetime.now() + timedelta(1)).strftime('%Y-%m-%d %H:%M:%S'))
+                    mysql.set_date_bouling(callback.from_user.id, (datetime.now() + timedelta(1)).strftime('%Y-%m-%d 00:00:10'))
                     mysql.up_attemp(callback.from_user.id, 1)
                 else:
                     await callback.message.answer('Не повезло☹️\nПопробуем еще раз?', reply_markup=get_bouling_keyboard())
@@ -501,13 +501,13 @@ async def command_play_basketball(callback: types.CallbackQuery, state: FSMConte
                 mysql.un_balance(callback.from_user.id, 100)
                 if data['basketball_point'] > 2:
                     await callback.message.answer('🏆 Ты победил!\nТебе начислено 5 попыток')
-                    mysql.set_date_basketball(callback.from_user.id, (datetime.now() + timedelta(1)).strftime('%Y-%m-%d %H:%M:%S'))
+                    mysql.set_date_basketball(callback.from_user.id, (datetime.now() + timedelta(1)).strftime('%Y-%m-%d 00:00:10'))
                     mysql.up_attemp(callback.from_user.id, 5)
                 else:
-                    await callback.message.answer('Ты израсходовал лимит игр и ничего не выиграл')
-                    mysql.set_date_basketball(callback.from_user.id, (datetime.now() + timedelta(1)).strftime('%Y-%m-%d %H:%M:%S'))
+                    await callback.message.answer('☹️ Ты израсходовал лимит игр и ничего не выиграл')
+                    mysql.set_date_basketball(callback.from_user.id, (datetime.now() + timedelta(1)).strftime('%Y-%m-%d 00:00:10'))
             elif data['basketball'] < 0:
-                await callback.message.answer('Ты израсходовал лимит игр на сегодня')
+                await callback.message.answer('☹️ Ты израсходовал лимит игр на сегодня')
             else:
                 data['basketball'] -= 1
                 result = await bot.send_dice(chat_id=callback.from_user.id, emoji="🏀")
@@ -517,7 +517,7 @@ async def command_play_basketball(callback: types.CallbackQuery, state: FSMConte
                     data['basketball_point'] += 1
                     await callback.message.answer('✨ Ты попал!\nПродолжай в том же духе!', reply_markup=get_basketball_keyboard())
                 else:
-                    await callback.message.answer('Не повезло☹️\nПопробуем еще раз?', reply_markup=get_basketball_keyboard())
+                    await callback.message.answer('Не повезло ☹️\nПопробуем еще раз?', reply_markup=get_basketball_keyboard())
     else:
         await callback.answer('⚠️ Не достаточно средств на балансе')
 
@@ -549,13 +549,13 @@ async def command_play_darts(callback: types.CallbackQuery, state: FSMContext):
                 mysql.un_balance(callback.from_user.id, 50)
                 await callback.message.delete()
                 if data['darts_point'] == True:
-                    await callback.message.answer('У тебя заончились броски.')
-                    mysql.set_date_darts(callback.from_user.id, (datetime.now() + timedelta(1)).strftime('%Y-%m-%d %H:%M:%S'))
+                    await callback.message.answer('☹️ У тебя заончились броски.')
+                    mysql.set_date_darts(callback.from_user.id, (datetime.now() + timedelta(1)).strftime('%Y-%m-%d 00:00:10'))
                 else:
-                    await callback.message.answer('Ты израсходовал лимит игр на сегодня')
-                    mysql.set_date_darts(callback.from_user.id, (datetime.now() + timedelta(1)).strftime('%Y-%m-%d %H:%M:%S'))
+                    await callback.message.answer('☹️ Ты израсходовал лимит игр на сегодня')
+                    mysql.set_date_darts(callback.from_user.id, (datetime.now() + timedelta(1)).strftime('%Y-%m-%d 00:00:10'))
             elif data['darts'] < 0:
-                await callback.message.answer('Ты израсходовал лимит игр на сегодня')
+                await callback.message.answer('☹️ Ты израсходовал лимит игр на сегодня')
             else:
                 data['darts'] -= 1
                 result = await bot.send_dice(chat_id=callback.from_user.id, emoji="🎯")
@@ -566,7 +566,7 @@ async def command_play_darts(callback: types.CallbackQuery, state: FSMContext):
                     await callback.message.answer('🔴 В яблочко!\nТебе начислена 1 попытка.', reply_markup=get_darts_keyboard())
                     mysql.up_attemp(callback.from_user.id, 1)
                 else:
-                    await callback.message.answer('Не повезло☹️\nПопробуем еще раз?', reply_markup=get_darts_keyboard())
+                    await callback.message.answer('Не повезло ☹️\nПопробуем еще раз?', reply_markup=get_darts_keyboard())
     else:
         await callback.answer('⚠️ Не достаточно средств на балансе')
 

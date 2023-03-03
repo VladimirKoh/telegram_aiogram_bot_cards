@@ -1,5 +1,44 @@
+INFO:apscheduler.scheduler:Scheduler started
 INFO:aiogram:Bot: TestVladimirBot [@TestVladimirKBot]
 WARNING:aiogram:Updates were skipped successfully.
 INFO:aiogram.dispatcher.dispatcher:Start polling.
+ERROR:aiogram.dispatcher.dispatcher:Cause exception while getting updates.
+Traceback (most recent call last):
+  File "/Users/vladimir/Desktop/MyTelegramProjectsBots/bot_cards_collection/venv/lib/python3.10/site-packages/aiogram/dispatcher/dispatcher.py", line 381, in start_polling
+    updates = await self.bot.get_updates(
+  File "/Users/vladimir/Desktop/MyTelegramProjectsBots/bot_cards_collection/venv/lib/python3.10/site-packages/aiogram/bot/bot.py", line 110, in get_updates
+    result = await self.request(api.Methods.GET_UPDATES, payload)
+  File "/Users/vladimir/Desktop/MyTelegramProjectsBots/bot_cards_collection/venv/lib/python3.10/site-packages/aiogram/bot/base.py", line 236, in request
+    return await api.make_request(await self.get_session(), self.server, self.__token, method, data, files,
+  File "/Users/vladimir/Desktop/MyTelegramProjectsBots/bot_cards_collection/venv/lib/python3.10/site-packages/aiogram/bot/api.py", line 139, in make_request
+    async with session.post(url, data=req, **kwargs) as response:
+  File "/Users/vladimir/Desktop/MyTelegramProjectsBots/bot_cards_collection/venv/lib/python3.10/site-packages/aiohttp/client.py", line 1141, in __aenter__
+    self._resp = await self._coro
+  File "/Users/vladimir/Desktop/MyTelegramProjectsBots/bot_cards_collection/venv/lib/python3.10/site-packages/aiohttp/client.py", line 560, in _request
+    await resp.start(conn)
+  File "/Users/vladimir/Desktop/MyTelegramProjectsBots/bot_cards_collection/venv/lib/python3.10/site-packages/aiohttp/client_reqrep.py", line 894, in start
+    with self._timer:
+  File "/Users/vladimir/Desktop/MyTelegramProjectsBots/bot_cards_collection/venv/lib/python3.10/site-packages/aiohttp/helpers.py", line 721, in __exit__
+    raise asyncio.TimeoutError from None
+asyncio.exceptions.TimeoutError
+ERROR:aiogram.dispatcher.dispatcher:Cause exception while getting updates.
+Traceback (most recent call last):
+  File "/Users/vladimir/Desktop/MyTelegramProjectsBots/bot_cards_collection/venv/lib/python3.10/site-packages/aiogram/dispatcher/dispatcher.py", line 381, in start_polling
+    updates = await self.bot.get_updates(
+  File "/Users/vladimir/Desktop/MyTelegramProjectsBots/bot_cards_collection/venv/lib/python3.10/site-packages/aiogram/bot/bot.py", line 110, in get_updates
+    result = await self.request(api.Methods.GET_UPDATES, payload)
+  File "/Users/vladimir/Desktop/MyTelegramProjectsBots/bot_cards_collection/venv/lib/python3.10/site-packages/aiogram/bot/base.py", line 236, in request
+    return await api.make_request(await self.get_session(), self.server, self.__token, method, data, files,
+  File "/Users/vladimir/Desktop/MyTelegramProjectsBots/bot_cards_collection/venv/lib/python3.10/site-packages/aiogram/bot/api.py", line 139, in make_request
+    async with session.post(url, data=req, **kwargs) as response:
+  File "/Users/vladimir/Desktop/MyTelegramProjectsBots/bot_cards_collection/venv/lib/python3.10/site-packages/aiohttp/client.py", line 1141, in __aenter__
+    self._resp = await self._coro
+  File "/Users/vladimir/Desktop/MyTelegramProjectsBots/bot_cards_collection/venv/lib/python3.10/site-packages/aiohttp/client.py", line 560, in _request
+    await resp.start(conn)
+  File "/Users/vladimir/Desktop/MyTelegramProjectsBots/bot_cards_collection/venv/lib/python3.10/site-packages/aiohttp/client_reqrep.py", line 894, in start
+    with self._timer:
+  File "/Users/vladimir/Desktop/MyTelegramProjectsBots/bot_cards_collection/venv/lib/python3.10/site-packages/aiohttp/helpers.py", line 721, in __exit__
+    raise asyncio.TimeoutError from None
+asyncio.exceptions.TimeoutError
 INFO:aiogram.dispatcher.dispatcher:Stop polling...
 WARNING:aiogram:Goodbye!

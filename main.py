@@ -19,14 +19,17 @@ from keyboards import *
 import mysql
 import os
 import logging
+import uuid
+import csv
 
 from yandex import sucsess_pay
 
 
 load()
-logging.basicConfig(level=logging.INFO, filename="py_log.log", filemode="w")
+logging.basicConfig(level=logging.INFO, filename="py_log.log", filemode="a")
 
 
+ADMIN_CHAT = os.getenv('ADMIN_CHAT')
 storage = MemoryStorage()
 bot = Bot(token=os.getenv('TOKEN'), parse_mode=types.ParseMode.HTML)
 dp = Dispatcher(bot=bot, storage=storage)
@@ -110,7 +113,10 @@ async def command_get_card(message: types.Message):
         count_cards = sum([i['get_point'] for i in all_cards])
         # card = [i for i in all_cards if i['id'] == card_id][0]
         await message.answer_photo(photo=open(card_user['url'], 'rb'), caption=f"🚙 Забирай свою новую тачку!\n\n💎 Редкость: {convert_type(card_user['type_card'])} (+{card_user['get_point']} pts)\n🏠 Всего у тебя: ({count_cards} pts)")
-        mysql.un_attemp(message.from_user.id)
+        try:
+            mysql.un_attemp(message.from_user.id)
+        except Exception as e:
+            logging.error(e)
     else:
         date_now = datetime.now()
         formatted_date_now = date_now.strftime('%Y-%m-%d %H:%M:%S')
@@ -131,8 +137,9 @@ async def command_get_card(message: types.Message):
                 mysql.add_card(card_user['id'], message.from_user.id)
                 all_cards = mysql.get_cards_user(message.from_user.id)
                 count_cards = sum([i['get_point'] for i in all_cards])
-                mysql.add_date_attemp(message.from_user.id, (date_now + timedelta(hours=3)).strftime('%Y-%m-%d %H:%M:%S'))
-                scheduler.add_job(send_message_get_cards, "date", run_date=date_now + timedelta(hours=3), args=(message.from_user.id, ))
+                date_next_run = date_now + timedelta(hours=3)
+                mysql.add_date_attemp(message.from_user.id, date_next_run.strftime('%Y-%m-%d %H:%M:%S'))
+                scheduler.add_job(send_message_get_cards, "date", run_date=date_next_run, args=(message.from_user.id, ))
             else:
                 type_card = random_card(False)
                 card_user = mysql.get_random_card(type_card)
@@ -165,14 +172,12 @@ async def command_my_garazhe(message: types.Message, state: FSMContext):
         data['page_all'] = page_all
         data['data'] = result2
         data['count_points'] = count_points
-    await message.answer_photo(open(result2[0], 'rb'),
+    try:
+        await message.answer_photo(open(result2[0], 'rb'),
                                caption=description,
                                reply_markup=get_pagination(data['page'], data['page_all']))
-
-
-@dp.callback_query_handler(Text(equals="basic_tuning"))
-async def callback_up_pay(callback: types.CallbackQuery):
-    await callback.answer('⚠️ У вас недостаточно дубликатов')
+    except Exception as e:
+        logging.error(e)
 
 
 @dp.message_handler(Text(equals="🏟 Universe"))
@@ -310,7 +315,6 @@ async def callback_top_10_players_seasone(callback: types.CallbackQuery):
 @dp.callback_query_handler(Text(equals='tuning'))
 async def callback_games(callback: types.CallbackQuery):
     data = mysql.get_cards_user_tuning(callback.from_user.id)
-    print(data)
     basic, civil, extra, rare = 0, 0, 0, 0 
     if data:
         for i in data:
@@ -319,9 +323,9 @@ async def callback_games(callback: types.CallbackQuery):
             elif i['type_card'] == 2:
                 civil = i['count_card']
             elif i['type_card'] == 3:
-                extra = i['count_card']
-            elif i['type_card'] == 4:
                 rare = i['count_card']
+            elif i['type_card'] == 4:
+                extra = i['count_card']
 
     await callback.answer('Tuning')
     text = f"""🛠️Добро пожаловать в Тюнинг!
@@ -342,15 +346,70 @@ Extra: {extra}
     await update_message(callback.message, text, tuning_keyboard)
 
 
-# @dp.callback_query_handler(Text(equals='basic_tuning'))
-# async def callback_basic_tuning(callback: types.CallbackQuery):
-#     data = mysql.get_cards_user_tuning(callback.from_user.id)
-#     for i in data:
-#         if i['type_card'] == 1:
-#             count_cards = i['count_cards']
-#             if count_cards >= 10:
-#                 await callback.message.answer('Вы скрафтили из 10 Basic и получили 3 попытки')
+@dp.callback_query_handler(Text(equals='basic_tuning'))
+async def callback_basic_tuning(callback: types.CallbackQuery):
+    data = mysql.get_cards_user_tuning(callback.from_user.id)
+    if not data:
+        await callback.answer('⚠️ У вас не достаточно дубликатов')
+    result = [i for i in data if i['type_card'] == 1][0]
+    if result.get('count_card', 0) >= 10:
+        await callback.answer(None)
+        mysql.delete_craft_10_cards(callback.from_user.id, 1, 10)
+        await callback.message.answer('Вы скрафтили из 10 Basic карт, вам начислено 3 попытки')
+        mysql.up_attemp(callback.from_user.id, 3)
+    else:
+        await callback.answer('⚠️ У вас не достаточно дубликатов')
 
+
+@dp.callback_query_handler(Text(equals='civil_tuning'))
+async def callback_civil_tuning(callback: types.CallbackQuery):
+    data = mysql.get_cards_user_tuning(callback.from_user.id)
+    if not data:
+        await callback.answer('⚠️ У вас не достаточно дубликатов')
+    result = [i for i in data if i['type_card'] == 2][0]
+    if result.get('count_card', 0) >= 10:
+        await callback.answer(None)
+        mysql.delete_craft_10_cards(callback.from_user.id, 2, 10)
+        await callback.message.answer('Вы скрафтили из 10 Civil карт, вам начислено 9 попыток')
+        mysql.up_attemp(callback.from_user.id, 9)
+    else:
+        await callback.answer('⚠️ У вас не достаточно дубликатов')
+
+
+@dp.callback_query_handler(Text(equals='rare_tuning'))
+async def callback_rare_tuning(callback: types.CallbackQuery):
+    data = mysql.get_cards_user_tuning(callback.from_user.id)
+    if not data:
+        await callback.answer('⚠️ У вас не достаточно дубликатов')
+    result = [i for i in data if i['type_card'] == 3][0]
+    if result.get('count_card', 0) >= 5:
+        await callback.answer(None)
+        mysql.delete_craft_10_cards(callback.from_user.id, 3, 5)
+        await callback.message.answer('Вы скрафтили из 5 Rare карт, вам выдана 1 Extra карта')
+        card_user = mysql.get_random_card(4)
+        mysql.add_card(card_user['id'], callback.from_user.id)
+        text = f"💎 Редкость: {convert_type(card_user['type_card'])} (+{card_user['get_point']} pts)"
+        await bot.send_photo(chat_id=callback.from_user.id, photo=open(card_user['url'], 'rb'), caption=text)
+    else:
+        await callback.answer('⚠️ У вас не достаточно дубликатов')
+
+
+@dp.callback_query_handler(Text(equals='extra_tuning'))
+async def callback_rare_tuning(callback: types.CallbackQuery):
+    data = mysql.get_cards_user_tuning(callback.from_user.id)
+    if not data:
+        await callback.answer('⚠️ У вас не достаточно дубликатов')
+    result = [i for i in data if i['type_card'] == 4][0]
+    if result.get('count_card', 0) >= 5:
+        await callback.answer(None)
+        mysql.delete_craft_10_cards(callback.from_user.id, 4, 5)
+        await callback.message.answer('Вы скрафтили из 5 Extra карт, вам выдана 1 Exclusive карта')
+        card_user = mysql.get_random_card(5)
+        mysql.add_card(card_user['id'], callback.from_user.id)
+        text = f"💎 Редкость: {convert_type(card_user['type_card'])} (+{card_user['get_point']} pts)"
+        await bot.send_photo(chat_id=callback.from_user.id, photo=open(card_user['url'], 'rb'), caption=text)
+    else:
+        await callback.answer('⚠️ У вас не достаточно дубликатов')
 
 
 @dp.callback_query_handler(Text(equals='games'))
@@ -364,11 +423,26 @@ async def callback_games(callback: types.CallbackQuery):
 async def callback_next(callback: types.CallbackQuery, state: FSMContext):
     await callback.answer(None)
     async with state.proxy() as data:
-        if data['page_all'] > data['page'] + 1:
-            data['page'] += 1
-            url_photo = data['data'][data['page']]
-            description = f"🚙 Мои карты\n\n🏠 Всего очков {data['count_points']}"
-            await update_media(callback.message, photo=open(url_photo, 'rb'), page_all=data['page_all'], page_now=data['page'], description=description)
+        try:
+            if data['page_all'] > data['page'] + 1:
+                data['page'] += 1
+                url_photo = data['data'][data['page']]
+                description = f"🚙 Мои карты\n\n🏠 Всего очков {data['count_points']}"
+                await update_media(callback.message, photo=open(url_photo, 'rb'), page_all=data['page_all'], page_now=data['page'], description=description)
+        except KeyError as e:
+            logging.error(e)
+            result = mysql.get_cards_user(callback.from_user.id)
+            result2 = list()
+            for i in result:
+                if i['url'] not in result2:
+                    result2.append(i['url'])
+            page_all = len(result2)
+            count_points = sum([i['get_point'] for i in result])
+            async with state.proxy() as data:
+                data['page'] = 0
+                data['page_all'] = page_all
+                data['data'] = result2
+                data['count_points'] = count_points
 
 
 @dp.callback_query_handler(Text(equals='back'))
@@ -570,7 +644,221 @@ async def command_play_darts(callback: types.CallbackQuery, state: FSMContext):
     else:
         await callback.answer('⚠️ Не достаточно средств на балансе')
 
+
+@dp.channel_post_handler(Text(startswith='/get_users_from_db'))
+async def command_admin_get_users_from_db(message: types.Message):
+    if message.sender_chat.id != int(ADMIN_CHAT):
+        return await message.answer('Идите на хуй, это не чат администратора')
+    print(message.sender_chat.id)
+    await message.answer('Вы запросили выгрузку ПОЛЬЗОВАТЕЛЕЙ из базы данных.\nОжидайте...')
+    result = mysql.get_users_for_file()
+    fields = ['user_id', 'attemp', 'balance', 'spot_pass', 'user_name']; 
+    with open('users.csv', 'w', encoding='utf-8-sig', newline='') as state_file:
+        writer = csv.DictWriter(state_file, fields, delimiter=';')
+        writer.writerows(result)
+    with open('users.csv', 'rb') as state_file:
+        await message.answer_document(state_file)
+
+
+@dp.channel_post_handler(Text(startswith='/delete_card'))
+async def command_admin_get_users_from_db(message: types.Message):
+    if message.sender_chat.id != int(ADMIN_CHAT):
+        return await message.answer('Идите на хуй, это не чат администратора')
+    command, id_card = message.text.split()
+    try:
+        mysql.delete_card(id_card)
+        await message.answer(f'Карта с id = {id_card} успешно удалена')
+    except Exception as e:
+        logging.error(e)
+
+
+@dp.channel_post_handler(Text(startswith='/checkuser'))
+async def command_admin_check_user(message: types.Message):
+    if message.sender_chat.id != int(ADMIN_CHAT):
+        return await message.answer('Идите на хуй, это не чат администратора')
+    command, user_name = message.text.split()
+    result = mysql.get_user_id_from_username(user_name)
+    yes = 'Да'
+    no = 'Нет'
+    if result:
+        await message.answer(text=f"<b>User_id:</b> {result['user_id']}\n<b>Никнейм:</b> {result['user_name']}\n<b>Баланс:</b> {result['balance']}\n<b>Донатер:</b> {yes if result['spot_pass'] == True else no}\n")
+    else:
+        await message.answer('У пользователя скрыт ник или вы ввели не правильно')
+
+
+@dp.channel_post_handler(Text(startswith='/help'))
+async def command_admin_get_users_from_db(message: types.Message):
+    if message.sender_chat.id != int(ADMIN_CHAT):
+        return await message.answer('Идите на хуй, это не чат администратора')
+    text = """<b>/admin_stat_cards (дата (2023-03-04))</b> - статика получения карт (дата через . или - ГОД:МЕСЯЦ:ДЕНЬ)
+<b>/admin_get_attamp (id_user) (количество)</b> - выдать попытки пользователю
+<b>/admin_stat_bot</b> - статистика
+<b>/admin_get_card_user (id_user) (id_card)</b> - выдать карту пользователю
+<b>/send_message_users (text)</b> - рассылка текста всем пользователям
+<b>/send_message_users_photo (text)</b> - ПИСАТЬ КОМАНДУ В ОПИСАНИЕ К ФОТО. расылка всем пользователям.
+<b>/send_message_user (id_user) (text)</b> - отправить текст конкретному пользователю
+<b>/delete_card (id_card)</b> - удалить карту из базы данных
+<b>/get_users_from_db</b> - выгрузить пользователей
+<b>/get_cards_from_db</b> - выгрузить карточки
+<b>/admin_get_attamp_all (количество попыток)</b> - выдать всем попытки
+<b>/checkuser (никнейм)</b> - узнать информацию о пользователе"""
+    await message.answer(text)
+
+
+@dp.channel_post_handler(Text(startswith='/get_cards_from_db'))
+async def command_admin_get_cards_from_db(message: types.Message):
+    if message.sender_chat.id != int(ADMIN_CHAT):
+        return await message.answer('Идите на хуй, это не чат администратора')
+    await message.answer('Вы запросили выгрузку КАРТОЧЕК из базы данных.\nОжидайте...')
+    result = mysql.get_cards_for_file()
+    fields = ['id', 'type_card', 'get_point', 'url']; 
+    with open('cards.csv', 'w', encoding='utf-8-sig', newline='') as state_file:
+        writer = csv.DictWriter(state_file, fields, delimiter=';')
+        writer.writerows(result)
+    with open('cards.csv', 'rb') as state_file:
+        await message.answer_document(state_file)
+
+
+@dp.channel_post_handler(Text(startswith='/admin_stat_cards'))
+async def command_admin_stat_cards(message: types.Message):
+    if message.sender_chat.id != int(ADMIN_CHAT):
+        return await message.answer('Идите на хуй, это не чат администратора')
+    command, date = message.text.split()
+    result = [f'Результат в день {date}\nЧасы - Количество карт\n\n']
+    list_result = mysql.get_stat_cards_on_date(date)
+    for i in list_result:
+        result.append(f"{str(i['hour']).rjust(2, '0')} -- {i['count_cards']}\n")
+    await message.answer(''.join(result))
+
+
+@dp.channel_post_handler(Text(startswith='/admin_get_attamp_all'))
+async def command_up_attemp_for_users(message: types.Message):
+    if message.sender_chat.id != int(ADMIN_CHAT):
+        return await message.answer('Идите на хуй, это не чат администратора')
+    result = mysql.get_users_for_message()
+    command, attemp = message.text.split()
+    try:
+        text = f'🎁 Тебе начислено {attemp} подарочных попыток!'
+        for i in result:
+            mysql.up_attemp(i['user_id'], attemp)
+            try:
+                await bot.send_message(chat_id=i['user_id'], text=text)
+            except Exception as e:
+                logging.error(e)
+        await message.answer(f'Выдали всем игрокам по {attemp} попыток')
+    except Exception as e:
+        logging.error(f'{command} не получилось выдать попытки, {e}')
+
         
+@dp.channel_post_handler(Text(startswith='/admin_get_attamp'))
+async def command_up_attemp_for_user(message: types.Message):
+    if message.sender_chat.id != int(ADMIN_CHAT):
+        return await message.answer('Идите на хуй, это не чат администратора')
+    try:
+        command, user_id, attemp = message.text.split()
+        mysql.up_attemp(user_id, attemp)
+        await message.answer(f'Игрок {user_id} получил {attemp} попыток')
+        text = f'🎁 Тебе начислено {attemp} подарочных попыток!'
+        await bot.send_message(chat_id=user_id, text=text)
+    except Exception as e:
+        logging.error(f'{command} {user_id} не получилось выдать попытки, {e}')
+
+
+@dp.channel_post_handler(Text(startswith='/admin_stat_bot'))
+async def command_admin_stat_bot(message: types.Message):
+    if message.sender_chat.id != int(ADMIN_CHAT):
+        return await message.answer('Идите на хуй, это не чат администратора')
+    try:
+        count_users = mysql.get_users()
+        all_cards = mysql.get_cards_count()
+        text = f"Всего пользователей заходило в бот - {count_users['count_users']}\nВсего выдано карточек - {all_cards['count_cards']}"
+        await message.answer(text)
+    except Exception as e:
+        logging.error(f'Ошибка статистики {e}')
+
+
+@dp.channel_post_handler(Text(startswith='/admin_get_card_user'))
+async def command_up_attemp_for_user(message: types.Message):
+    if message.sender_chat.id != int(ADMIN_CHAT):
+        return await message.answer('Идите на хуй, это не чат администратора')
+    try:
+        command, user_id, card_id = message.text.split()
+        all_cards = mysql.get_cards_list()
+        if int(card_id) in [i['id'] for i in all_cards]:
+            mysql.add_card(card_id, user_id)
+            card = [i for i in all_cards if i['id'] == int(card_id)][0]
+            text = f"🎁 Лови свой подарок!\n\n💎 Редкость: {convert_type(card['type_card'])} (+{card['get_point']} pts)"
+            await bot.send_photo(chat_id=user_id, photo=open(card['url'], 'rb'), caption=text)
+            await message.answer(f'Игрок {user_id} получил карту id = {card_id}')
+        else:
+            await message.answer('Карты с таким id не существует')
+    except Exception as e:
+        logging.error(f'Ошибка при выдаче карты игроку {user_id}, id card = {card_id}, -- {e}')
+
+
+@dp.channel_post_handler(Text(startswith='/send_message_user'))
+async def command_send_message_user(message: types.Message):
+    if message.sender_chat.id != int(ADMIN_CHAT):
+        return await message.answer('Идите на хуй, это не чат администратора')
+    command, user_id, *message_for_users = message.text.split()
+    text = ' '.join(message_for_users)
+    try:
+        await bot.send_message(chat_id=user_id, text=text)
+    except BotBlocked as e:
+        await message.answer('Пользователь заблокировал бота, ваше смс ему не долшло')
+
+
+@dp.channel_post_handler(Text(startswith='/send_message_users'))
+async def command_send_message_users(message: types.Message):
+    if message.sender_chat.id != int(ADMIN_CHAT):
+        return await message.answer('Идите на хуй, это не чат администратора')
+    result = mysql.get_users_for_message()
+    command, *message_for_users = message.text.split()
+    text = ' '.join(message_for_users)
+    for i in result:
+        try:
+            await bot.send_message(chat_id=i['user_id'], text=text)
+        except Exception as e:
+            pass
+
+
+@dp.channel_post_handler(content_types=['photo'])
+async def command_send_messages_users_photo(message: types.Message):
+    if message.sender_chat.id != int(ADMIN_CHAT):
+        return await message.answer('Идите на хуй, это не чат администратора')
+    if len(message.caption.split()) == 3:
+        comand, type_card, point = message.caption.split()
+        if comand == '/add_card':
+            type_card = int(type_card)
+            name_file = uuid.uuid4()
+            if type_card == 1:
+                path_type = 'Basic'
+            elif type_card == 2:
+                path_type = 'Civil'
+            elif type_card == 3:
+                path_type = 'Rare'
+            elif type_card == 4:
+                path_type = 'Extra'
+            elif type_card == 5:
+                path_type = 'Exclusive'
+            try:
+                await message.photo[-1].download(destination_file=f'cards/{path_type}/{name_file}.png')
+                url = f'cards/{path_type}/{name_file}.png'
+                mysql.add_card_on_table_cards(type_card, point, url)
+            except Exception as e:
+                logging.error(f'Ошибка добавления карточки в базу данных {e}')
+    else:
+        result = mysql.get_users_for_message()
+        command, *message_for_users = message.caption.split()
+        if command == '/send_message_users_photo':
+            text = ' '.join(message_for_users)
+            for i in result:
+                try:
+                    await bot.send_photo(chat_id=i['user_id'], photo=message.photo[-1].file_id, caption=text)
+                except Exception as e:
+                    pass
+
+
 if __name__ == '__main__':
     scheduler = AsyncIOScheduler(timezone='Europe/Moscow')
     scheduler.start()

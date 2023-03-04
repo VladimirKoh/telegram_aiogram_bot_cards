@@ -34,10 +34,45 @@ def add_card(id_card: int, user_id: str):
     connection.close()
 
 
+def add_card_on_table_cards(type_card, get_point, url):
+    connection = connect()
+    with connection.cursor() as cursor:
+        query = "INSERT INTO `cards` (`type_card`, `get_point`, `url`) VALUES(%s, %s, %s)"
+        cursor.execute(query, (type_card, get_point, url))
+        connection.commit()
+    connection.close()
+
+
 def add_date_attemp(user_id: str, date_time):
     connection = connect()
     with connection.cursor() as cursor:
         query = f"UPDATE users SET date_attemp = '{date_time}' WHERE user_id = {user_id}"
+        cursor.execute(query)
+        connection.commit()
+    connection.close()
+
+
+def delete_craft_10_cards(user_id: str, type_card, count_craft):
+    connection = connect()
+    with connection.cursor() as cursor:
+        query = f"""DELETE FROM users_cards
+WHERE id in (
+SELECT min_id
+  FROM `my_view_craft_1` 
+    WHERE (id_user_id = {user_id}) AND (type_card = {type_card}) AND 
+(SELECT COUNT(1) counted
+  FROM `my_view_craft_1`
+    WHERE id_user_id = {user_id} AND type_card = {type_card}) >= {count_craft})
+limit 10"""
+        cursor.execute(query)
+        connection.commit()
+    connection.close()
+
+
+def delete_card(card_id):
+    connection = connect()
+    with connection.cursor() as cursor:
+        query = f"""DELETE FROM cards WHERE id = {card_id}"""
         cursor.execute(query)
         connection.commit()
     connection.close()
@@ -234,6 +269,89 @@ def get_user(user_id: str):
     return data
 
 
+def get_user_id_from_username(user_name: str):
+    connection = connect()
+    with connection.cursor() as cursor:
+        query = f"SELECT * FROM `users` WHERE `user_name` = '{user_name}'"
+        cursor.execute(query)
+    data = cursor.fetchone()
+    connection.close()
+    return data
+
+
+def get_users_for_file():
+    connection = connect()
+    with connection.cursor() as cursor:
+        query = f"SELECT user_id, attemp, balance, spot_pass, user_name  FROM `users`"
+        cursor.execute(query)
+    data = cursor.fetchall()
+    connection.close()
+    return data
+
+
+def get_cards_for_file():
+    connection = connect()
+    with connection.cursor() as cursor:
+        query = f"SELECT *  FROM `cards`"
+        cursor.execute(query)
+    data = cursor.fetchall()
+    connection.close()
+    return data
+
+
+def get_users():
+    connection = connect()
+    with connection.cursor() as cursor:
+        query = f"SELECT count(*) AS count_users FROM `users`"
+        cursor.execute(query)
+    data = cursor.fetchone()
+    connection.close()
+    return data
+
+
+def get_users_for_message():
+    connection = connect()
+    with connection.cursor() as cursor:
+        query = f"SELECT user_id FROM `users`"
+        cursor.execute(query)
+    data = cursor.fetchall()
+    connection.close()
+    return data
+
+
+def get_stat_cards_on_date(date):
+    connection = connect()
+    with connection.cursor() as cursor:
+        query = f"""SELECT HOUR(date_get) as hour, COUNT(*) as count_cards FROM users_cards
+WHERE DAY(date_get) = DAY('{date}')
+GROUP BY HOUR(date_get)
+HAVING count_cards > 1 ORDER BY count_cards DESC"""
+        cursor.execute(query)
+    data = cursor.fetchall()
+    connection.close()
+    return data
+
+
+def get_cards_count():
+    connection = connect()
+    with connection.cursor() as cursor:
+        query = f"SELECT count(*) AS count_cards FROM `users_cards`"
+        cursor.execute(query)
+    data = cursor.fetchone()
+    connection.close()
+    return data
+
+
+def get_cards_list():
+    connection = connect()
+    with connection.cursor() as cursor:
+        query = f"SELECT * FROM `cards`"
+        cursor.execute(query)
+    data = cursor.fetchall()
+    connection.close()
+    return data
+
+
 def get_cards_user_distinct(user_id: str):
     connection = connect()
     with connection.cursor() as cursor:
@@ -282,7 +400,6 @@ LIMIT 10"""
         cursor.execute(query)
     data = cursor.fetchall()
     connection.close()
-    print(data)
     return data
 
 
@@ -299,14 +416,4 @@ LIMIT 10;"""
         cursor.execute(query)
     data = cursor.fetchall()
     connection.close()
-    print(data)
     return data
-        
-    
-# def insert_cards(type: int, point: int, path: str):
-#     connection = connect()
-#     with connection.cursor() as cursor:
-#         query = "INSERT INTO `cards` (`type_card`, `get_point`, `url`) VALUES (%s, %s, %s)"
-#         cursor.execute(query, (type, point, path))
-#         connection.commit()
-#     connection.close()

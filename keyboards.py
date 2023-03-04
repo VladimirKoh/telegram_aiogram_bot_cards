@@ -111,8 +111,8 @@ def cancel_keyboard() -> InlineKeyboardMarkup:
 def tuning_keyboard() -> InlineKeyboardMarkup:
     ikb = InlineKeyboardMarkup(row_width=1)
     ib1 = InlineKeyboardButton('Скрафтить из 10 Basic', callback_data='basic_tuning')
-    ib2 = InlineKeyboardButton('Скрафтить из 10 Civil', callback_data='basic_tuning')
-    ib3 = InlineKeyboardButton('Скрафтить из 5 Rare', callback_data='basic_tuning')
-    ib4 = InlineKeyboardButton('Скрафтить из 5 Extra', callback_data='basic_tuning')
+    ib2 = InlineKeyboardButton('Скрафтить из 10 Civil', callback_data='civil_tuning')
+    ib3 = InlineKeyboardButton('Скрафтить из 5 Rare', callback_data='rare_tuning')
+    ib4 = InlineKeyboardButton('Скрафтить из 5 Extra', callback_data='extra_tuning')
     ikb.add(ib1, ib2, ib3, ib4)
     return ikb

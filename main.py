@@ -294,6 +294,8 @@ async def callback_top_10_players(callback: types.CallbackQuery):
     result_list = list()
     result_list.append('🏆 Топ-10 игроков за все время \n\n')
     for i,j in enumerate(data, 1):
+        if j['user_name'] is None:
+            j['user_name'] = 'Anonimus'
         result_list.append(f"{i}. {j['user_name']} - <b>{int(j['sum_point'])} pts</b>\n")
     text = ''.join(result_list)
     await update_message(callback.message, text, None)
@@ -307,6 +309,8 @@ async def callback_top_10_players_seasone(callback: types.CallbackQuery):
     result_list = list()
     result_list.append('🏆 Топ-10 игроков сезона\n\n')
     for i,j in enumerate(data, 1):
+        if j['user_name'] is None:
+            j['user_name'] = 'Anonimus'
         result_list.append(f"{i}. {j['user_name']} - <b>{int(j['sum_point'])} pts</b>\n")
     text = ''.join(result_list)
     await update_message(callback.message, text, None)

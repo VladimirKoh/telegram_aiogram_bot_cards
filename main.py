@@ -805,18 +805,6 @@ async def command_up_attemp_for_user(message: types.Message):
         logging.error(f'Ошибка при выдаче карты игроку {user_id}, id card = {card_id}, -- {e}')
 
 
-@dp.channel_post_handler(Text(startswith='/send_message_user'))
-async def command_send_message_user(message: types.Message):
-    if message.sender_chat.id != int(ADMIN_CHAT):
-        return await message.answer('Идите на хуй, это не чат администратора')
-    command, user_id, *message_for_users = message.text.split()
-    text = ' '.join(message_for_users)
-    try:
-        await bot.send_message(chat_id=user_id, text=text)
-    except BotBlocked as e:
-        await message.answer('Пользователь заблокировал бота, ваше смс ему не долшло')
-
-
 @dp.channel_post_handler(Text(startswith='/send_message_users'))
 async def command_send_message_users(message: types.Message):
     if message.sender_chat.id != int(ADMIN_CHAT):
@@ -829,6 +817,18 @@ async def command_send_message_users(message: types.Message):
             await bot.send_message(chat_id=i['user_id'], text=text)
         except Exception as e:
             pass
+
+
+@dp.channel_post_handler(Text(startswith='/send_message_user'))
+async def command_send_message_user(message: types.Message):
+    if message.sender_chat.id != int(ADMIN_CHAT):
+        return await message.answer('Идите на хуй, это не чат администратора')
+    command, user_id, *message_for_users = message.text.split()
+    text = ' '.join(message_for_users)
+    try:
+        await bot.send_message(chat_id=user_id, text=text)
+    except BotBlocked as e:
+        await message.answer('Пользователь заблокировал бота, ваше смс ему не долшло')
 
 
 @dp.channel_post_handler(content_types=['photo'])
@@ -869,6 +869,6 @@ async def command_send_messages_users_photo(message: types.Message):
 
 
 if __name__ == '__main__':
-    scheduler = AsyncIOScheduler(timezone='Europe/Moscow') # при заливке на сервер убирать тайм зону
+    scheduler = AsyncIOScheduler() # при заливке на сервер убирать тайм зону
     scheduler.start()
     executor.start_polling(dp, skip_updates=True)

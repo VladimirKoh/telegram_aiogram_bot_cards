@@ -139,7 +139,7 @@ async def command_get_card(message: types.Message):
                 count_cards = sum([i['get_point'] for i in all_cards])
                 date_next_run = date_now + timedelta(hours=3)
                 mysql.add_date_attemp(message.from_user.id, date_next_run.strftime('%Y-%m-%d %H:%M:%S'))
-                scheduler.add_job(send_message_get_cards, "date", run_date=date_next_run, args=(message.from_user.id, ))
+                scheduler.add_job(send_message_get_cards, "date", next_run_time=date_next_run , args=(message.from_user.id, ))
             else:
                 type_card = random_card(False)
                 card_user = mysql.get_random_card(type_card)
@@ -705,6 +705,15 @@ async def command_admin_get_users_from_db(message: types.Message):
     await message.answer(text)
 
 
+@dp.channel_post_handler(Text(startswith='/apschedule'))
+async def command_admin_get_users_from_db(message: types.Message):
+    if message.sender_chat.id != int(ADMIN_CHAT):
+        return await message.answer('Идите на хуй, это не чат администратора')
+    job = scheduler.get_jobs()
+    print(job)
+    await message.answer(text='job')
+
+
 @dp.channel_post_handler(Text(startswith='/get_cards_from_db'))
 async def command_admin_get_cards_from_db(message: types.Message):
     if message.sender_chat.id != int(ADMIN_CHAT):
@@ -860,6 +869,6 @@ async def command_send_messages_users_photo(message: types.Message):
 
 
 if __name__ == '__main__':
-    scheduler = AsyncIOScheduler(timezone='Europe/Moscow')
+    scheduler = AsyncIOScheduler(timezone='Europe/Moscow') # при заливке на сервер убирать тайм зону
     scheduler.start()
     executor.start_polling(dp, skip_updates=True)

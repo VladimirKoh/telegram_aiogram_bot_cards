@@ -3,4 +3,4 @@ __pycache__/
 cards/
 venv/
 .env
-*.log
+py_log.log

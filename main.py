@@ -109,10 +109,11 @@ async def command_get_card(message: types.Message):
             type_card = random_card(False)
         card_user = mysql.get_random_card(type_card)
         mysql.add_card(card_user['id'], message.from_user.id)
-        all_cards = mysql.get_cards_user(message.from_user.id)
-        count_cards = sum([i['get_point'] for i in all_cards])
+        point_user = mysql.set_point(message.from_user.id, card_user['get_point'])
+        # all_cards = mysql.get_cards_user(message.from_user.id)
+        # count_cards = sum([i['get_point'] for i in all_cards])
         # card = [i for i in all_cards if i['id'] == card_id][0]
-        await message.answer_photo(photo=open(card_user['url'], 'rb'), caption=f"🚙 Забирай свою новую тачку!\n\n💎 Редкость: {convert_type(card_user['type_card'])} (+{card_user['get_point']} pts)\n🏠 Всего у тебя: ({count_cards} pts)")
+        await message.answer_photo(photo=open(card_user['url'], 'rb'), caption=f"🚙 Забирай свою новую тачку!\n\n💎 Редкость: {convert_type(card_user['type_card'])} (+{card_user['get_point']} pts)\n🏠 Всего у тебя: ({point_user['points']} pts)")
         try:
             mysql.un_attemp(message.from_user.id)
         except Exception as e:
@@ -135,8 +136,9 @@ async def command_get_card(message: types.Message):
                 type_card = random_card(True)
                 card_user = mysql.get_random_card(type_card)
                 mysql.add_card(card_user['id'], message.from_user.id)
-                all_cards = mysql.get_cards_user(message.from_user.id)
-                count_cards = sum([i['get_point'] for i in all_cards])
+                point_user = mysql.set_point(message.from_user.id, card_user['get_point'])
+                # all_cards = mysql.get_cards_user(message.from_user.id)
+                # count_cards = sum([i['get_point'] for i in all_cards])
                 date_next_run = date_now + timedelta(hours=3)
                 mysql.add_date_attemp(message.from_user.id, date_next_run.strftime('%Y-%m-%d %H:%M:%S'))
                 scheduler.add_job(send_message_get_cards, "date", next_run_time=date_next_run , args=(message.from_user.id, ))
@@ -144,15 +146,17 @@ async def command_get_card(message: types.Message):
                 type_card = random_card(False)
                 card_user = mysql.get_random_card(type_card)
                 mysql.add_card(card_user['id'], message.from_user.id)
-                all_cards = mysql.get_cards_user(message.from_user.id)
-                count_cards = sum([i['get_point'] for i in all_cards])
+                point_user = mysql.set_point(message.from_user.id, card_user['get_point'])
+                # all_cards = mysql.get_cards_user(message.from_user.id)
+                # count_cards = sum([i['get_point'] for i in all_cards])
                 mysql.add_date_attemp(message.from_user.id, (date_now + timedelta(hours=4)).strftime('%Y-%m-%d %H:%M:%S'))
-            await message.answer_photo(photo=open(card_user['url'], 'rb'), caption=f"🚙 Забирай свою новую тачку!\n\n💎 Редкость: {convert_type(card_user['type_card'])} (+{card_user['get_point']} pts)\n🏠 Всего у тебя: ({count_cards} pts)")
+            await message.answer_photo(photo=open(card_user['url'], 'rb'), caption=f"🚙 Забирай свою новую тачку!\n\n💎 Редкость: {convert_type(card_user['type_card'])} (+{card_user['get_point']} pts)\n🏠 Всего у тебя: ({point_user['points']} pts)")
 
 
 @dp.message_handler(Text(equals="🏠 Мой гараж"))
 async def command_my_garazhe(message: types.Message, state: FSMContext):
-    if not mysql.get_user(message.from_user.id):
+    user_info = mysql.get_user(message.from_user.id)
+    if not user_info:
         mysql.add_user(message.from_user.id, message.from_user.username)
     result = mysql.get_cards_user(message.from_user.id)
     result2 = list()
@@ -164,7 +168,7 @@ async def command_my_garazhe(message: types.Message, state: FSMContext):
     # result2 = list({i['url'] for i in result})
     # result2 = mysql.get_cards_user(message.from_user.id)
     # с оптимизировать
-    count_points = sum([i['get_point'] for i in result])
+    count_points = user_info.get('points', 0)
     page_all = len(result2)
     description = f"🚙 Мои карты\n\n🏠 Всего очков {count_points}"
     async with state.proxy() as data:
@@ -183,6 +187,11 @@ async def command_my_garazhe(message: types.Message, state: FSMContext):
 @dp.message_handler(Text(equals="🏟 Universe"))
 async def command_menu(message: types.Message):
     await message.answer('💬 Выберите действие по кнопкам ниже', reply_markup=get_universe_keyboard())
+
+
+# @dp.message_handler(Text(equals="getalluserspointsukafixbug"))
+# async def command_admin_menu(message: types.Message):
+#     await message.answer('угадай где картчока', reply_markup=
 
 
 @dp.callback_query_handler(Text(equals="up_pay"))
@@ -287,7 +296,6 @@ async def callback_pay_spot_pass(callback: types.CallbackQuery):
 
 
 @dp.callback_query_handler(Text(equals="top_10_players"))
-# user_id заменить на ЛОГИНЫ
 async def callback_top_10_players(callback: types.CallbackQuery):
     await callback.answer(None)
     data = mysql.get_top_10_players()
@@ -296,13 +304,12 @@ async def callback_top_10_players(callback: types.CallbackQuery):
     for i,j in enumerate(data, 1):
         if j['user_name'] is None:
             j['user_name'] = 'Anonimus'
-        result_list.append(f"{i}. {j['user_name']} - <b>{int(j['sum_point'])} pts</b>\n")
+        result_list.append(f"{i}. {j['user_name']} - <b>{j['points']} pts</b>\n")
     text = ''.join(result_list)
     await update_message(callback.message, text, None)
 
 
 @dp.callback_query_handler(Text(equals="top_10_players_seasone"))
-# user_id заменить на ЛОГИНЫ
 async def callback_top_10_players_seasone(callback: types.CallbackQuery):
     await callback.answer(None)
     data = mysql.get_top_10_players_seasone()
@@ -311,7 +318,7 @@ async def callback_top_10_players_seasone(callback: types.CallbackQuery):
     for i,j in enumerate(data, 1):
         if j['user_name'] is None:
             j['user_name'] = 'Anonimus'
-        result_list.append(f"{i}. {j['user_name']} - <b>{int(j['sum_point'])} pts</b>\n")
+        result_list.append(f"{i}. {j['user_name']} - <b>{j['points']} pts</b>\n")
     text = ''.join(result_list)
     await update_message(callback.message, text, None)
 
@@ -392,6 +399,7 @@ async def callback_rare_tuning(callback: types.CallbackQuery):
         await callback.message.answer('Вы скрафтили из 5 Rare карт, вам выдана 1 Extra карта')
         card_user = mysql.get_random_card(4)
         mysql.add_card(card_user['id'], callback.from_user.id)
+        mysql.set_point(callback.from_user.id, card_user['get_point'])
         text = f"💎 Редкость: {convert_type(card_user['type_card'])} (+{card_user['get_point']} pts)"
         await bot.send_photo(chat_id=callback.from_user.id, photo=open(card_user['url'], 'rb'), caption=text)
     else:
@@ -410,6 +418,7 @@ async def callback_rare_tuning(callback: types.CallbackQuery):
         await callback.message.answer('Вы скрафтили из 5 Extra карт, вам выдана 1 Exclusive карта')
         card_user = mysql.get_random_card(5)
         mysql.add_card(card_user['id'], callback.from_user.id)
+        mysql.set_point(callback.from_user.id, card_user['get_point'])
         text = f"💎 Редкость: {convert_type(card_user['type_card'])} (+{card_user['get_point']} pts)"
         await bot.send_photo(chat_id=callback.from_user.id, photo=open(card_user['url'], 'rb'), caption=text)
     else:
@@ -441,7 +450,7 @@ async def callback_next(callback: types.CallbackQuery, state: FSMContext):
                 if i['url'] not in result2:
                     result2.append(i['url'])
             page_all = len(result2)
-            count_points = sum([i['get_point'] for i in result])
+            count_points = mysql.set_point(callback.from_user.id, 0)['points']
             async with state.proxy() as data:
                 data['page'] = 0
                 data['page_all'] = page_all
@@ -453,11 +462,14 @@ async def callback_next(callback: types.CallbackQuery, state: FSMContext):
 async def callback_back(callback: types.CallbackQuery, state: FSMContext):
     await callback.answer(None)
     async with state.proxy() as data:
-        if data['page'] > 0:
-            data['page'] -= 1
-            url_photo = data['data'][data['page']]
-            description = f"🚙 Мои карты\n\n🏠 Всего очков {data['count_points']}"
-            await update_media(callback.message, photo=open(url_photo, 'rb'), page_all=data['page_all'], page_now=data['page'], description=description)
+        try:
+            if data['page'] > 0:
+                data['page'] -= 1
+                url_photo = data['data'][data['page']]
+                description = f"🚙 Мои карты\n\n🏠 Всего очков {data['count_points']}"
+                await update_media(callback.message, photo=open(url_photo, 'rb'), page_all=data['page_all'], page_now=data['page'], description=description)
+        except Exception as e:
+            logging.error(f'Просто еблан пытается листать назад, {e}')
 
 
 @dp.callback_query_handler(Text(equals='game_cube'))
@@ -800,6 +812,7 @@ async def command_up_attemp_for_user(message: types.Message):
         if int(card_id) in [i['id'] for i in all_cards]:
             mysql.add_card(card_id, user_id)
             card = [i for i in all_cards if i['id'] == int(card_id)][0]
+            mysql.set_point(user_id, card['get_point'])
             text = f"🎁 Лови свой подарок!\n\n💎 Редкость: {convert_type(card['type_card'])} (+{card['get_point']} pts)"
             await bot.send_photo(chat_id=user_id, photo=open(card['url'], 'rb'), caption=text)
             await message.answer(f'Игрок {user_id} получил карту id = {card_id}')

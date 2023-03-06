@@ -96,6 +96,19 @@ def up_attemp(user_id: str, attemp):
     connection.close()
 
 
+def set_point(user_id: str, point):
+    connection = connect()
+    with connection.cursor() as cursor:
+        query = f"UPDATE users SET points = points + {point} WHERE user_id = {user_id}"
+        cursor.execute(query)
+        connection.commit()
+        query = f"SELECT points FROM users WHERE user_id = {user_id}"
+        cursor.execute(query)
+    data = cursor.fetchone()
+    connection.close()
+    return data
+
+
 def un_attemp_cube(user_id: str):
     connection = connect()
     with connection.cursor() as cursor:
@@ -255,7 +268,6 @@ def get_random_card(type_card: int):
         cursor.execute(query)
     data = cursor.fetchone()
     connection.close()
-    print(data)
     return data
 
 
@@ -391,11 +403,8 @@ GROUP BY type_card"""
 def get_top_10_players():
     connection = connect()
     with connection.cursor() as cursor:
-        query = f"""SELECT u.user_id, u.user_name, sum(c.get_point) as sum_point FROM users_cards AS uc
-JOIN users AS u ON u.user_id = uc.id_user_id
-JOIN cards AS c ON c.id = uc.id_card
-GROUP BY u.user_id
-ORDER BY sum_point DESC
+        query = f"""SELECT user_name, points FROM `users`
+ORDER BY points DESC
 LIMIT 10"""
         cursor.execute(query)
     data = cursor.fetchall()
@@ -406,7 +415,7 @@ LIMIT 10"""
 def get_top_10_players_seasone():
     connection = connect()
     with connection.cursor() as cursor:
-        query = f"""SELECT u.user_id, u.user_name, sum(c.get_point) as sum_point FROM users_cards AS uc
+        query = f"""SELECT u.user_id, u.user_name, u.points, sum(c.get_point) as sum_point FROM users_cards AS uc
 JOIN users AS u ON u.user_id = uc.id_user_id
 JOIN cards AS c ON c.id = uc.id_card
 WHERE MONTH(date_get) = MONTH(NOW()) 

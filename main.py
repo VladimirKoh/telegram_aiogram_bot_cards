@@ -70,6 +70,12 @@ async def edit_text_and_keyboard2(message: types.Message, new_text: str, func: I
             await message.edit_text(new_text, reply_markup=func())
 
 
+async def apschedule_game_cube():
+    date_now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    mysql.set_game_cube(date_now)
+    mysql.set_game_cube_with_spot_pass()
+
+
 async def send_message_get_cards(user_id):
     try:
         await bot.send_message(chat_id=user_id, text="🚙 Пришло время получить новую тачку!")
@@ -717,7 +723,8 @@ async def command_admin_get_users_from_db(message: types.Message):
 <b>/get_users_from_db</b> - выгрузить пользователей
 <b>/get_cards_from_db</b> - выгрузить карточки
 <b>/admin_get_attamp_all (количество попыток)</b> - выдать всем попытки
-<b>/checkuser (никнейм)</b> - узнать информацию о пользователе"""
+<b>/checkuser (никнейм)</b> - узнать информацию о пользователе
+<b>/add_card (тип 1-5, 6 - лимитированая) (кол очков)</b> - загрузить карту в базу данных"""
     await message.answer(text)
 
 
@@ -867,6 +874,8 @@ async def command_send_messages_users_photo(message: types.Message):
                 path_type = 'Extra'
             elif type_card == 5:
                 path_type = 'Exclusive'
+            elif type_card == 6:
+                path_type = 'Limited'
             try:
                 await message.photo[-1].download(destination_file=f'cards/{path_type}/{name_file}.png')
                 url = f'cards/{path_type}/{name_file}.png'
@@ -887,5 +896,6 @@ async def command_send_messages_users_photo(message: types.Message):
 
 if __name__ == '__main__':
     scheduler = AsyncIOScheduler() # при заливке на сервер убирать тайм зону
+    scheduler.add_job(apschedule_game_cube, "cron", day_of_week=0, hour=0)
     scheduler.start()
     executor.start_polling(dp, skip_updates=True)

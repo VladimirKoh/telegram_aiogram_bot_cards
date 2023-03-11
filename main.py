@@ -26,7 +26,7 @@ from yandex import sucsess_pay
 
 
 load()
-logging.basicConfig(level=logging.INFO, filename="py_log.log", filemode="a")
+logging.basicConfig(level=logging.INFO, filename="py_log.log", filemode="a", format='%(levelname)s - %(asctime)s - %(message)s', datefmt='%d-%b-%y %H:%M:%S')
 
 
 ADMIN_CHAT = os.getenv('ADMIN_CHAT')
@@ -76,6 +76,16 @@ async def apschedule_game_cube():
     mysql.set_game_cube_with_spot_pass()
 
 
+async def apschedule_check_spot_pass():
+    # сделать запрос к бд, который отбирает только тех у кого спот пасс, проверяем дату, если кончилась ставим нулл
+    date_now = datetime.now()
+    users = mysql.get_users_apschedule_spot_pass()
+    for user in users:
+        if user['date_spot_pass'] < date_now:
+            mysql.set_date_spot_pass(user['user_id'], None)
+            mysql.un_spot_pass(user['user_id'])
+
+
 async def send_message_get_cards(user_id):
     try:
         await bot.send_message(chat_id=user_id, text="🚙 Пришло время получить новую тачку!")
@@ -116,9 +126,6 @@ async def command_get_card(message: types.Message):
         card_user = mysql.get_random_card(type_card)
         mysql.add_card(card_user['id'], message.from_user.id)
         point_user = mysql.set_point(message.from_user.id, card_user['get_point'])
-        # all_cards = mysql.get_cards_user(message.from_user.id)
-        # count_cards = sum([i['get_point'] for i in all_cards])
-        # card = [i for i in all_cards if i['id'] == card_id][0]
         await message.answer_photo(photo=open(card_user['url'], 'rb'), caption=f"🚙 Забирай свою новую тачку!\n\n💎 Редкость: {convert_type(card_user['type_card'])} (+{card_user['get_point']} pts)\n🏠 Всего у тебя: ({point_user['points']} pts)")
         try:
             mysql.un_attemp(message.from_user.id)
@@ -126,7 +133,7 @@ async def command_get_card(message: types.Message):
             logging.error(e)
     else:
         date_now = datetime.now()
-        formatted_date_now = date_now.strftime('%Y-%m-%d %H:%M:%S')
+        # formatted_date_now = date_now.strftime('%Y-%m-%d %H:%M:%S')
         if user_info['date_attemp'] > date_now:
             delta = user_info['date_attemp'] - date_now
             s = delta.seconds
@@ -143,8 +150,6 @@ async def command_get_card(message: types.Message):
                 card_user = mysql.get_random_card(type_card)
                 mysql.add_card(card_user['id'], message.from_user.id)
                 point_user = mysql.set_point(message.from_user.id, card_user['get_point'])
-                # all_cards = mysql.get_cards_user(message.from_user.id)
-                # count_cards = sum([i['get_point'] for i in all_cards])
                 date_next_run = date_now + timedelta(hours=3)
                 mysql.add_date_attemp(message.from_user.id, date_next_run.strftime('%Y-%m-%d %H:%M:%S'))
                 scheduler.add_job(send_message_get_cards, "date", next_run_time=date_next_run , args=(message.from_user.id, ))
@@ -153,8 +158,6 @@ async def command_get_card(message: types.Message):
                 card_user = mysql.get_random_card(type_card)
                 mysql.add_card(card_user['id'], message.from_user.id)
                 point_user = mysql.set_point(message.from_user.id, card_user['get_point'])
-                # all_cards = mysql.get_cards_user(message.from_user.id)
-                # count_cards = sum([i['get_point'] for i in all_cards])
                 mysql.add_date_attemp(message.from_user.id, (date_now + timedelta(hours=4)).strftime('%Y-%m-%d %H:%M:%S'))
             await message.answer_photo(photo=open(card_user['url'], 'rb'), caption=f"🚙 Забирай свою новую тачку!\n\n💎 Редкость: {convert_type(card_user['type_card'])} (+{card_user['get_point']} pts)\n🏠 Всего у тебя: ({point_user['points']} pts)")
 
@@ -171,9 +174,6 @@ async def command_my_garazhe(message: types.Message, state: FSMContext):
             result2.append(i['url'])
     if len(result2) == 0:
         await message.answer('У вас еще нет карточек')
-    # result2 = list({i['url'] for i in result})
-    # result2 = mysql.get_cards_user(message.from_user.id)
-    # с оптимизировать
     count_points = user_info.get('points', 0)
     page_all = len(result2)
     description = f"🚙 Мои карты\n\n🏠 Всего очков {count_points}"
@@ -193,11 +193,6 @@ async def command_my_garazhe(message: types.Message, state: FSMContext):
 @dp.message_handler(Text(equals="🏟 Universe"))
 async def command_menu(message: types.Message):
     await message.answer('💬 Выберите действие по кнопкам ниже', reply_markup=get_universe_keyboard())
-
-
-# @dp.message_handler(Text(equals="getalluserspointsukafixbug"))
-# async def command_admin_menu(message: types.Message):
-#     await message.answer('угадай где картчока', reply_markup=
 
 
 @dp.callback_query_handler(Text(equals="up_pay"))
@@ -247,19 +242,9 @@ async def callback_check_balance_pay(callback: types.CallbackQuery):
         mysql.set_date_spot_pass(callback.from_user.id, next_data.strftime('%Y-%m-%d %H:%M:%S'))
         # проставить дату на месяц вперед.
         await callback.message.answer('Вы приобрели Caroholics Membership', reply_markup=get_universe_keyboard())
-        mysql.set_date_cube(callback.from_user.id, datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+        mysql.set_date_cube(callback.from_user.id, datetime.now().strftime('%Y-%m-%d 00:00:10'))
     else:
         await callback.answer('⚠️ Платеж не найден\nПопробуйте проверить через несколько секунд.', show_alert=True)
-
-
-# @dp.message_handler(commands=['spot_pass'])
-# async def admin_test(message: types.Message):
-#     next_data = datetime.now() + timedelta(30)
-#     mysql.up_spot_pass(message.from_user.id)
-#     mysql.set_date_spot_pass(message.from_user.id, next_data.strftime('%Y-%m-%d %H:%M:%S'))
-#     # проставить дату на месяц вперед.
-#     await message.answer('Вы приобрели Caroholics Membership', reply_markup=get_universe_keyboard())
-#     mysql.set_date_cube(message.from_user.id, datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
 
 
 @dp.callback_query_handler(Text(startswith='check_pay_'))
@@ -324,7 +309,7 @@ async def callback_top_10_players_seasone(callback: types.CallbackQuery):
     for i,j in enumerate(data, 1):
         if j['user_name'] is None:
             j['user_name'] = 'Anonimus'
-        result_list.append(f"{i}. {j['user_name']} - <b>{j['points']} pts</b>\n")
+        result_list.append(f"{i}. {j['user_name']} - <b>{j['sum_point']} pts</b>\n")
     text = ''.join(result_list)
     await update_message(callback.message, text, None)
 
@@ -367,7 +352,7 @@ Extra: {extra}
 async def callback_basic_tuning(callback: types.CallbackQuery):
     data = mysql.get_cards_user_tuning(callback.from_user.id)
     if not data:
-        await callback.answer('⚠️ У вас не достаточно дубликатов')
+        return await callback.answer('⚠️ У вас не достаточно дубликатов')
     result = [i for i in data if i['type_card'] == 1][0]
     if result.get('count_card', 0) >= 10:
         await callback.answer(None)
@@ -382,7 +367,7 @@ async def callback_basic_tuning(callback: types.CallbackQuery):
 async def callback_civil_tuning(callback: types.CallbackQuery):
     data = mysql.get_cards_user_tuning(callback.from_user.id)
     if not data:
-        await callback.answer('⚠️ У вас не достаточно дубликатов')
+        return await callback.answer('⚠️ У вас не достаточно дубликатов')
     result = [i for i in data if i['type_card'] == 2][0]
     if result.get('count_card', 0) >= 10:
         await callback.answer(None)
@@ -397,7 +382,7 @@ async def callback_civil_tuning(callback: types.CallbackQuery):
 async def callback_rare_tuning(callback: types.CallbackQuery):
     data = mysql.get_cards_user_tuning(callback.from_user.id)
     if not data:
-        await callback.answer('⚠️ У вас не достаточно дубликатов')
+        return await callback.answer('⚠️ У вас не достаточно дубликатов')
     result = [i for i in data if i['type_card'] == 3][0]
     if result.get('count_card', 0) >= 5:
         await callback.answer(None)
@@ -416,7 +401,7 @@ async def callback_rare_tuning(callback: types.CallbackQuery):
 async def callback_rare_tuning(callback: types.CallbackQuery):
     data = mysql.get_cards_user_tuning(callback.from_user.id)
     if not data:
-        await callback.answer('⚠️ У вас не достаточно дубликатов')
+        return await callback.answer('⚠️ У вас не достаточно дубликатов')
     result = [i for i in data if i['type_card'] == 4][0]
     if result.get('count_card', 0) >= 5:
         await callback.answer(None)
@@ -897,5 +882,6 @@ async def command_send_messages_users_photo(message: types.Message):
 if __name__ == '__main__':
     scheduler = AsyncIOScheduler() # при заливке на сервер убирать тайм зону
     scheduler.add_job(apschedule_game_cube, "cron", day_of_week=0, hour=0)
+    scheduler.add_job(apschedule_check_spot_pass, "cron", hour=3)
     scheduler.start()
     executor.start_polling(dp, skip_updates=True)

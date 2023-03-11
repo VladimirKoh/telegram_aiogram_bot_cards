@@ -145,6 +145,15 @@ def up_spot_pass(user_id):
     connection.close()
 
 
+def un_spot_pass(user_id):
+    connection = connect()
+    with connection.cursor() as cursor:
+        query = f"UPDATE users SET spot_pass = False WHERE user_id = {user_id}"
+        cursor.execute(query)
+        connection.commit()
+    connection.close()
+
+
 def set_game_cube(date):
     connection = connect()
     with connection.cursor() as cursor:
@@ -333,6 +342,16 @@ def get_users_for_apschedule():
     connection = connect()
     with connection.cursor() as cursor:
         query = f"SELECT * FROM `users`"
+        cursor.execute(query)
+    data = cursor.fetchall()
+    connection.close()
+    return data
+
+
+def get_users_apschedule_spot_pass():
+    connection = connect()
+    with connection.cursor() as cursor:
+        query = f"SELECT * FROM `users` where date_spot_pass"
         cursor.execute(query)
     data = cursor.fetchall()
     connection.close()

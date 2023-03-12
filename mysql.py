@@ -96,10 +96,28 @@ def up_attemp(user_id: str, attemp):
     connection.close()
 
 
+def set_apschedule_points_seasone_null():
+    connection = connect()
+    with connection.cursor() as cursor:
+        query = f"UPDATE users SET points_seasone = 0"
+        cursor.execute(query)
+        connection.commit()
+    connection.close()
+
+
+def set_points_seasone(user_id, points):
+    connection = connect()
+    with connection.cursor() as cursor:
+        query = f"UPDATE users SET points_seasone = {points} WHERE user_id = {user_id}"
+        cursor.execute(query)
+        connection.commit()
+    connection.close()
+
+
 def set_point(user_id: str, point):
     connection = connect()
     with connection.cursor() as cursor:
-        query = f"UPDATE users SET points = points + {point} WHERE user_id = {user_id}"
+        query = f"UPDATE users SET points = points + {point}, points_seasone = points_seasone + {point} WHERE user_id = {user_id}"
         cursor.execute(query)
         connection.commit()
         query = f"SELECT points FROM users WHERE user_id = {user_id}"
@@ -462,13 +480,9 @@ LIMIT 10"""
 def get_top_10_players_seasone():
     connection = connect()
     with connection.cursor() as cursor:
-        query = f"""SELECT u.user_id, u.user_name, u.points, sum(c.get_point) as sum_point FROM users_cards AS uc
-JOIN users AS u ON u.user_id = uc.id_user_id
-JOIN cards AS c ON c.id = uc.id_card
-WHERE MONTH(date_get) = MONTH(NOW()) 
-GROUP BY u.user_id
-ORDER BY sum_point DESC
-LIMIT 10;"""
+        query = f"""SELECT user_name, points_seasone FROM `users`
+ORDER BY points_seasone DESC
+LIMIT 10"""
         cursor.execute(query)
     data = cursor.fetchall()
     connection.close()

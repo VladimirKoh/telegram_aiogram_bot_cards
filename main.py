@@ -86,6 +86,13 @@ async def apschedule_check_spot_pass():
             mysql.un_spot_pass(user['user_id'])
 
 
+async def apschedule_points_seasone():
+    try:
+        mysql.set_apschedule_points_seasone_null()
+    except Exception as e:
+        logging.error(f'Не обнулились очки 1 числа {e}')
+
+
 async def send_message_get_cards(user_id):
     try:
         await bot.send_message(chat_id=user_id, text="🚙 Пришло время получить новую тачку!")
@@ -133,7 +140,6 @@ async def command_get_card(message: types.Message):
             logging.error(e)
     else:
         date_now = datetime.now()
-        # formatted_date_now = date_now.strftime('%Y-%m-%d %H:%M:%S')
         if user_info['date_attemp'] > date_now:
             delta = user_info['date_attemp'] - date_now
             s = delta.seconds
@@ -309,7 +315,7 @@ async def callback_top_10_players_seasone(callback: types.CallbackQuery):
     for i,j in enumerate(data, 1):
         if j['user_name'] is None:
             j['user_name'] = 'Anonimus'
-        result_list.append(f"{i}. {j['user_name']} - <b>{j['sum_point']} pts</b>\n")
+        result_list.append(f"{i}. {j['user_name']} - <b>{j['points_seasone']} pts</b>\n")
     text = ''.join(result_list)
     await update_message(callback.message, text, None)
 
@@ -881,7 +887,8 @@ async def command_send_messages_users_photo(message: types.Message):
 
 if __name__ == '__main__':
     scheduler = AsyncIOScheduler() # при заливке на сервер убирать тайм зону
-    scheduler.add_job(apschedule_game_cube, "cron", day_of_week=0, hour=0)
+    scheduler.add_job(apschedule_game_cube, "cron", day_of_week=0, hour=3)
+    scheduler.add_job(apschedule_points_seasone, "cron", day=1)
     scheduler.add_job(apschedule_check_spot_pass, "cron", hour=3)
     scheduler.start()
     executor.start_polling(dp, skip_updates=True)
